@@ -55,3 +55,12 @@ Mobile-first anonymous fishing trip reporting for Jamaica Fishing Intelligence.
 - Seasonal analysis should be based on effort-adjusted observations and only feed the opportunity index after validation and scoring-model versioning.
 
 © Andrew 'Cheeky'
+
+## v1.0.2 form updates
+- Mixed is a single fishing method, with no follow-up method-selection question.
+- When Yes is selected for a catch, add as many species rows as needed with **+ Add another catch species**. Each row records a species and quantity.
+- No database migration required. Redeploy Worker and assets after updating GitHub.
+
+## Cloudflare D1 configuration
+
+`wrangler.jsonc` contains the supplied `fishing-logs-db` D1 database ID. Run `npm install`, then `npm run db:remote` after authenticating with Cloudflare. Configure Turnstile keys as Worker variables/secrets before accepting reports.

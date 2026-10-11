@@ -17,7 +17,8 @@ export function normalizeTrip(raw) {
   const method = String(raw.method || '');
   if (!METHODS.includes(method)) throw new Error('Choose a fishing method.');
   const mixed_methods = method === 'Mixed' ? [...new Set(Array.isArray(raw.mixed_methods) ? raw.mixed_methods : [])] : [];
-  if (method === 'Mixed' && (mixed_methods.length < 2 || mixed_methods.some(x=> !METHODS.slice(0,3).includes(x)))) throw new Error('Select at least two methods for Mixed.');
+  // Mixed is a standalone method; no secondary method selections required.
+  if (mixed_methods.some(x=> !METHODS.slice(0,3).includes(x))) throw new Error('Invalid mixed fishing method.');
   const target_species = String(raw.target_species || '');
   if (!SPECIES.includes(target_species)) throw new Error('Choose the target species.');
   const hours_fished = Number(raw.hours_fished);
