@@ -7,4 +7,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "fishing-logs-db", "database_id": "cda939f6-29e4-4314-9b46-a081af8ba097" }
   ]
+  "vars": {
+    "TURNSTILE_SECRET": "0x4AAAAAAFUFQWX6nXpo60NNcxLcy1m6pAg",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFUFQdzX_tEqlkMa"
+  },
 }
