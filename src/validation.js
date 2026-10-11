@@ -1,7 +1,11 @@
 export const METHODS = ['Trolling', 'Vertical Jigging', 'Bottom Fishing', 'Mixed'];
 export const SPECIES = ['Tuna', 'Mahi-mahi', 'Wahoo', 'Marlin', 'Sailfish', 'Snapper', 'Grouper', 'Jacks / Amberjack', 'King Mackerel', 'Spanish Mackerel', 'Other'];
-// Bank names are configured separately so they can be reconciled with the 13-map-bank master list.
-export const BANKS = ['Pedro Bank', 'Morant Bank', 'Formigas Bank', 'Mackerel (Bowditch) Bank', 'California Bank', 'Other / Not listed'];
+// Authoritative 13 fishing locations supplied for Jamaica Fishing Logs.
+export const BANKS = [
+  'Mackerel (Bowditch)', 'California Bank', 'South Drop', 'Port Royal',
+  'Henry Holmes Bank', 'Grappler Bank', 'Formigas Bank', 'Mobay Airport',
+  'Trident Castle', 'Rio Grande', 'Falmouth Pier', 'Morant Cays', 'Maiden Cay'
+];
 export function normalizeTrip(raw) {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid report.');
   const fishing_date = String(raw.fishing_date || '');

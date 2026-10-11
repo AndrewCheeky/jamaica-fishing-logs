@@ -17,7 +17,7 @@ Mobile-first anonymous fishing trip reporting for Jamaica Fishing Intelligence.
 
 ## Important before launch
 
-**Bank list:** `src/validation.js` currently contains only *five verified/example names plus Other / Not listed*. Replace this with the authoritative 13-bank list from the Marine Maps project before public launch. Do not assume this is the complete list.
+**Bank list:** `src/validation.js` contains the 13 fishing locations supplied for this project. The same list is served to the form by `/api/config` and validated on the server.
 
 **Turnstile:** Submission intentionally fails closed until both `TURNSTILE_SECRET` and `TURNSTILE_SITE_KEY` are configured. For production set the secret using `npx wrangler secret put TURNSTILE_SECRET` and set `TURNSTILE_SITE_KEY` as a Worker variable in the Cloudflare dashboard (or `wrangler.jsonc` `vars`).
 
@@ -47,7 +47,7 @@ Mobile-first anonymous fishing trip reporting for Jamaica Fishing Intelligence.
 
 ## Known limitations / next phase
 
-- The 13-bank authoritative master list must be imported.
+- The 13 supplied fishing locations are configured and tested.
 - Edit-after-reload interface and private admin dashboard are not implemented.
 - Browser-scoped duplicate checking is not a full identity-based anti-fraud system.
 - Future voluntary profiles require explicit opt-in and separate identity data.
