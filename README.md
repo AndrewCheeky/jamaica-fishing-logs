@@ -1,2 +1,57 @@
-# jamaica-fishing-logs
-Fishing logs for species in Jamaica
+# Jamaica Fishing Logs v1.0
+
+Mobile-first anonymous fishing trip reporting for Jamaica Fishing Intelligence.
+
+**Target site:** https://fishing-logs.andrewcheeky.com  
+**Related maps:** https://fishing.andrewcheeky.com
+
+## Included
+
+- Anonymous-by-default reporting. No angler name or account is requested.
+- Date, bank, target species, method, effort (hours and anglers), and zero-catch trips.
+- Trolling, Vertical Jigging, Bottom Fishing, and Mixed (choose at least two methods).
+- Multiple catch species in one report, including Sailfish.
+- Browser-scoped duplicate checks (10 minutes and a broader same-date check), unique submission IDs, and edit tokens.
+- Cloudflare Turnstile security checks, D1 persistence, edit audit trail.
+- Mobile-friendly responsive UI and automated validation tests.
+
+## Important before launch
+
+**Bank list:** `src/validation.js` currently contains only *five verified/example names plus Other / Not listed*. Replace this with the authoritative 13-bank list from the Marine Maps project before public launch. Do not assume this is the complete list.
+
+**Turnstile:** Submission intentionally fails closed until both `TURNSTILE_SECRET` and `TURNSTILE_SITE_KEY` are configured. For production set the secret using `npx wrangler secret put TURNSTILE_SECRET` and set `TURNSTILE_SITE_KEY` as a Worker variable in the Cloudflare dashboard (or `wrangler.jsonc` `vars`).
+
+**Privacy:** Browser ID is random and stored locally, then hashed server-side. It is not a person identifier. Duplicate controls cannot guarantee prevention across different browsers/devices. This is a data-quality aid, not identity verification. Do not publish individual trip records. The server stores free-text notes, so anglers are warned not to include personal details.
+
+**Editing:** A secret edit token is returned once and kept only in the current browser session's application state; it is not transmitted to third parties. The API supports loading and editing by token, but the v1 UI's Edit button works immediately after submission. After reloading, restoring the saved edit token and original form is a planned enhancement. No admin dashboard is included in this initial release.
+
+## Deployment
+
+1. Create a **new GitHub repository** `jamaica-fishing-logs` and upload these files. Keep it private while testing.
+2. Create a Cloudflare D1 database named `fishing-logs-db` in your Cloudflare account.
+3. Copy the real D1 `database_id` into `wrangler.jsonc` replacing `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
+4. Install Node.js 22+ locally, then run `npm install` and `npm test`.
+5. Authenticate: `npx wrangler login`.
+6. Run `npm run db:remote` to apply the D1 schema.
+7. Create a Cloudflare Turnstile widget for `fishing-logs.andrewcheeky.com`. Configure `TURNSTILE_SITE_KEY` in Worker environment variables and set `TURNSTILE_SECRET` with `npx wrangler secret put TURNSTILE_SECRET`.
+8. Run `npm run deploy`. Verify `/api/config` and test a real submission, a zero-catch trip, duplicate protection, and immediate editing.
+9. In Cloudflare Workers & Pages → your Worker → Settings → Domains & Routes, add custom domain `fishing-logs.andrewcheeky.com`. Cloudflare manages its DNS route and certificate.
+10. Add a **Report Your Catch** link from `fishing.andrewcheeky.com`.
+
+## Architecture
+
+- Cloudflare Worker handles `/api/*`.
+- Worker static assets serve `public/`.
+- Cloudflare D1 holds trips, catches, and edit audit entries.
+- No public listing or personal name collection.
+
+## Known limitations / next phase
+
+- The 13-bank authoritative master list must be imported.
+- Edit-after-reload interface and private admin dashboard are not implemented.
+- Browser-scoped duplicate checking is not a full identity-based anti-fraud system.
+- Future voluntary profiles require explicit opt-in and separate identity data.
+- Before accepting public reports, add rate limiting/WAF controls, monitoring, a retention policy, and a privacy notice suited to the jurisdiction.
+- Seasonal analysis should be based on effort-adjusted observations and only feed the opportunity index after validation and scoring-model versioning.
+
+© Andrew 'Cheeky'
