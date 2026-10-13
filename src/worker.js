@@ -29,7 +29,7 @@ export default {
   if (req.method==='GET' && url.pathname==='/api/admin/fisheries-report') {
     const expected = env.REPORT_ADMIN_TOKEN;
     const provided = req.headers.get('authorization') || '';
-    if (!expected || typeof expected !== 'string' || expected.length < 24) return respond({error:'Admin reporting is not configured.'},503);
+    if (typeof expected !== 'string' || expected.length < 1 || expected.length > 8) return respond({error:'Admin reporting is not configured.'},503);
     if (!provided.startsWith('Bearer ') || provided.slice(7) !== expected) return respond({error:'Unauthorized.'},401);
     const from = url.searchParams.get('from'), to = url.searchParams.get('to');
     const dateOK = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s+'T00:00:00Z'));
