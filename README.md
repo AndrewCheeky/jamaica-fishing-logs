@@ -64,3 +64,16 @@ Mobile-first anonymous fishing trip reporting for Jamaica Fishing Intelligence.
 ## Cloudflare D1 configuration
 
 `wrangler.jsonc` contains the supplied `fishing-logs-db` D1 database ID. Run `npm install`, then `npm run db:remote` after authenticating with Cloudflare. Configure Turnstile keys as Worker variables/secrets before accepting reports.
+
+
+## Private fisheries summary (v1.1.0)
+
+Open `/fisheries-report.html` on your deployed Worker. This page retrieves aggregated data from the existing `trips` and `catches` D1 tables through `GET /api/admin/fisheries-report?from=YYYY-MM-DD&to=YYYY-MM-DD&bank=...`. No database migration is required.
+
+**Required security configuration:** In Cloudflare Workers → Settings → Variables and Secrets, create a **Secret** named `REPORT_ADMIN_TOKEN` with a long, unpredictable value (at least 24 characters; 40+ recommended). Keep this out of GitHub. Enter the token into the dashboard to retrieve a report. The token is kept only in page memory; it is not saved in localStorage or sent to third parties. Use HTTPS. Restrict the report page with Cloudflare Access as an additional protection if available.
+
+`keep_vars: true` is set in `wrangler.jsonc` to preserve dashboard variables and secrets on deploy; verify this with your deployment method. The existing Turnstile secrets are not included in the repository.
+
+**Data definitions:** Angler-hours = sum(hours_fished × anglers_count). Fish-per-angler-hour = sum(catches.quantity)/angler-hours. Vessel-hours = sum(hours_fished). `anglers_count` is summed as angler participations, not unique people. No weighting, deduplication beyond existing ingestion rules, or statistical adjustment for selection bias. Self-reported data is not independently verified and should not be characterized as official fishery landings.
+
+**Privacy:** Only aggregated bank/species/method summaries are returned, without free-text notes or individual trip records. For small sample sizes, consider withholding or combining bank-level rows before external distribution. The reporting token grants read access to all aggregate records; rotate it if compromised.

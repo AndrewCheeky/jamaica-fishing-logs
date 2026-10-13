@@ -26,6 +26,25 @@ export default {
   const url = new URL(req.url);
   if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
   if (!env.DB) return respond({error:'Database not configured.'},503);
+  if (req.method==='GET' && url.pathname==='/api/admin/fisheries-report') {
+    const expected = env.REPORT_ADMIN_TOKEN;
+    const provided = req.headers.get('authorization') || '';
+    if (!expected || typeof expected !== 'string' || expected.length < 24) return respond({error:'Admin reporting is not configured.'},503);
+    if (!provided.startsWith('Bearer ') || provided.slice(7) !== expected) return respond({error:'Unauthorized.'},401);
+    const from = url.searchParams.get('from'), to = url.searchParams.get('to');
+    const dateOK = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s+'T00:00:00Z'));
+    if (!dateOK(from) || !dateOK(to) || from > to || (Date.parse(to)-Date.parse(from)) > 366*86400000) return respond({error:'Choose a valid date range of up to 366 days.'},400);
+    const bank = url.searchParams.get('bank') || '';
+    if (bank && !BANKS.includes(bank)) return respond({error:'Invalid fishing bank.'},400);
+    const filter = bank ? ' AND t.bank = ?' : '';
+    const args = bank ? [from,to,bank] : [from,to];
+    const summary = await env.DB.prepare(`SELECT COUNT(*) AS trips, COALESCE(SUM(t.caught_any),0) AS successful_trips, COALESCE(SUM(t.hours_fished),0) AS vessel_hours, COALESCE(SUM(t.hours_fished*t.anglers_count),0) AS angler_hours, COALESCE(SUM(t.anglers_count),0) AS angler_participations, COUNT(DISTINCT t.bank) AS banks_reporting FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter}`).bind(...args).first();
+    const byBank = (await env.DB.prepare(`SELECT t.bank, COUNT(*) AS trips, SUM(t.caught_any) AS successful_trips, SUM(t.hours_fished*t.anglers_count) AS angler_hours, COALESCE((SELECT SUM(c.quantity) FROM catches c JOIN trips tc ON tc.id=c.trip_id WHERE tc.bank=t.bank AND tc.fishing_date BETWEEN ? AND ?),0) AS catch_count FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY t.bank ORDER BY trips DESC, t.bank`).bind(from,to,...args).all()).results;
+    const species = (await env.DB.prepare(`SELECT c.species, SUM(c.quantity) AS quantity, COUNT(DISTINCT t.id) AS trips_with_species FROM catches c JOIN trips t ON t.id=c.trip_id WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY c.species ORDER BY quantity DESC, c.species`).bind(...args).all()).results;
+    const methods = (await env.DB.prepare(`SELECT t.method, COUNT(*) AS trips FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY t.method ORDER BY trips DESC`).bind(...args).all()).results;
+    const totalCatch = species.reduce((sum,s)=>sum+Number(s.quantity),0);
+    return respond({period:{from,to,bank:bank||'All banks'},generated_at:new Date().toISOString(),summary:{...summary,total_catch:totalCatch,zero_catch_trips:Number(summary.trips)-Number(summary.successful_trips),cpue: Number(summary.angler_hours)>0?totalCatch/Number(summary.angler_hours):null},by_bank:byBank,species,methods,notes:['Voluntary self-reported observations; not independently verified.','Counts are fish reported, not weight or biomass.','CPUE is fish per angler-hour, calculated as total fish divided by the sum of fishing hours multiplied by anglers per trip.','The sample is not necessarily representative of Jamaica-wide landings or fishing activity.','Angler names, free-text notes, browser identifiers and trip-level records are excluded.']});
+  }
   if (req.method==='GET' && url.pathname==='/api/config') return respond({banks:BANKS,methods:METHODS,species:SPECIES,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null});
   if (req.method==='GET' && url.pathname.startsWith('/api/trips/')) {
     const id=url.pathname.split('/')[3], token=req.headers.get('x-edit-token');
