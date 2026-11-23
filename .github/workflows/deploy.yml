@@ -1,9 +1,7 @@
 name: Deploy
 # Publishes the site to Cloudflare: database updates first, then the Worker.
-# Runs when a change is merged to main, or by hand: Actions → Deploy → Run workflow.
+# Backup only: run by hand (Actions → Deploy → Run workflow). Normal publishing is Cloudflare's own Git connection.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
