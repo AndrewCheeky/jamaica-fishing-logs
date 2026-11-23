@@ -32,7 +32,13 @@ export function normalizeTrip(raw) {
   const cleanCatches = catches.map(c=>{
     const species = String(c?.species || ''); const quantity = Number(c?.quantity);
     if (!SPECIES.includes(species) || !Number.isInteger(quantity) || quantity < 1 || quantity > 10000) throw new Error('Check catch species and quantity.');
-    return {species, quantity};
+    let weight_lb = null;
+    if (c?.weight_lb !== undefined && c?.weight_lb !== null && c?.weight_lb !== '') {
+      weight_lb = Number(c.weight_lb);
+      if (!Number.isFinite(weight_lb) || weight_lb <= 0 || weight_lb > 20000) throw new Error('Approx weight must be between 0 and 20,000 lb.');
+      weight_lb = Math.round(weight_lb*10)/10;
+    }
+    return {species, quantity, weight_lb};
   });
   const notes = String(raw.notes || '').trim();
   if (notes.length > 500) throw new Error('Notes must be 500 characters or fewer.');

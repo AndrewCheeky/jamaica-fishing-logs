@@ -18,7 +18,7 @@ async function verifyTurnstile(token, req, env) {
 }
 async function insertCatches(db,id,catches) {
   if (!catches.length) return [];
-  return catches.map(c=>db.prepare('INSERT INTO catches (trip_id,species,quantity) VALUES (?,?,?)').bind(id,c.species,c.quantity));
+  return catches.map(c=>db.prepare('INSERT INTO catches (trip_id,species,quantity,weight_lb) VALUES (?,?,?,?)').bind(id,c.species,c.quantity,c.weight_lb??null));
 }
 const validId = s => typeof s === 'string' && /^[a-f0-9-]{36}$/.test(s);
 export default {
@@ -39,11 +39,12 @@ export default {
     const filter = bank ? ' AND t.bank = ?' : '';
     const args = bank ? [from,to,bank] : [from,to];
     const summary = await env.DB.prepare(`SELECT COUNT(*) AS trips, COALESCE(SUM(t.caught_any),0) AS successful_trips, COALESCE(SUM(t.hours_fished),0) AS vessel_hours, COALESCE(SUM(t.hours_fished*t.anglers_count),0) AS angler_hours, COALESCE(SUM(t.anglers_count),0) AS angler_participations, COUNT(DISTINCT t.bank) AS banks_reporting FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter}`).bind(...args).first();
-    const byBank = (await env.DB.prepare(`SELECT t.bank, COUNT(*) AS trips, SUM(t.caught_any) AS successful_trips, SUM(t.hours_fished*t.anglers_count) AS angler_hours, COALESCE((SELECT SUM(c.quantity) FROM catches c JOIN trips tc ON tc.id=c.trip_id WHERE tc.bank=t.bank AND tc.fishing_date BETWEEN ? AND ?),0) AS catch_count FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY t.bank ORDER BY trips DESC, t.bank`).bind(from,to,...args).all()).results;
-    const species = (await env.DB.prepare(`SELECT c.species, SUM(c.quantity) AS quantity, COUNT(DISTINCT t.id) AS trips_with_species FROM catches c JOIN trips t ON t.id=c.trip_id WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY c.species ORDER BY quantity DESC, c.species`).bind(...args).all()).results;
+    const byBank = (await env.DB.prepare(`SELECT t.bank, COUNT(*) AS trips, SUM(t.caught_any) AS successful_trips, SUM(t.hours_fished*t.anglers_count) AS angler_hours, COALESCE((SELECT SUM(c.quantity) FROM catches c JOIN trips tc ON tc.id=c.trip_id WHERE tc.bank=t.bank AND tc.fishing_date BETWEEN ? AND ?),0) AS catch_count, (SELECT SUM(c.weight_lb) FROM catches c JOIN trips tc ON tc.id=c.trip_id WHERE tc.bank=t.bank AND tc.fishing_date BETWEEN ? AND ?) AS weight_lb FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY t.bank ORDER BY trips DESC, t.bank`).bind(from,to,from,to,...args).all()).results;
+    const species = (await env.DB.prepare(`SELECT c.species, SUM(c.quantity) AS quantity, SUM(c.weight_lb) AS weight_lb, COUNT(c.weight_lb) AS weighed_lines, COUNT(DISTINCT t.id) AS trips_with_species FROM catches c JOIN trips t ON t.id=c.trip_id WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY c.species ORDER BY quantity DESC, c.species`).bind(...args).all()).results;
     const methods = (await env.DB.prepare(`SELECT t.method, COUNT(*) AS trips FROM trips t WHERE t.fishing_date BETWEEN ? AND ?${filter} GROUP BY t.method ORDER BY trips DESC`).bind(...args).all()).results;
     const totalCatch = species.reduce((sum,s)=>sum+Number(s.quantity),0);
-    return respond({period:{from,to,bank:bank||'All banks'},generated_at:new Date().toISOString(),summary:{...summary,total_catch:totalCatch,zero_catch_trips:Number(summary.trips)-Number(summary.successful_trips),cpue: Number(summary.angler_hours)>0?totalCatch/Number(summary.angler_hours):null},by_bank:byBank,species,methods,notes:['Voluntary self-reported observations; not independently verified.','Counts are fish reported, not weight or biomass.','CPUE is fish per angler-hour, calculated as total fish divided by the sum of fishing hours multiplied by anglers per trip.','The sample is not necessarily representative of Jamaica-wide landings or fishing activity.','Angler names, free-text notes, browser identifiers and trip-level records are excluded.']});
+    const totalWeight = species.reduce((sum,s)=>sum+Number(s.weight_lb||0),0);
+    return respond({period:{from,to,bank:bank||'All banks'},generated_at:new Date().toISOString(),summary:{...summary,total_catch:totalCatch,total_weight_lb:Math.round(totalWeight*10)/10,total_weight_kg:Math.round(totalWeight*0.45359237*10)/10,zero_catch_trips:Number(summary.trips)-Number(summary.successful_trips),cpue: Number(summary.angler_hours)>0?totalCatch/Number(summary.angler_hours):null},by_bank:byBank,species,methods,notes:['Voluntary self-reported observations; not independently verified.','Fish counts are as reported. Weights are optional angler estimates (lb) and only cover catch lines where a weight was given, so weight totals are a minimum.','CPUE is fish per angler-hour, calculated as total fish divided by the sum of fishing hours multiplied by anglers per trip.','The sample is not necessarily representative of Jamaica-wide landings or fishing activity.','Angler names, free-text notes, browser identifiers and trip-level records are excluded.']});
   }
   if (req.method==='GET' && url.pathname==='/api/config') return respond({banks:BANKS,methods:METHODS,species:SPECIES,turnstileSiteKey:env.TURNSTILE_SITE_KEY||null});
   if (req.method==='GET' && url.pathname.startsWith('/api/trips/')) {
@@ -51,7 +52,7 @@ export default {
     if (!validId(id)||!token) return respond({error:'Report access token required.'},403);
     const trip=await env.DB.prepare('SELECT * FROM trips WHERE id=? AND edit_token_hash=?').bind(id,await sha(token)).first();
     if (!trip) return respond({error:'Report not found or access denied.'},404);
-    const catches=(await env.DB.prepare('SELECT species,quantity FROM catches WHERE trip_id=?').bind(id).all()).results;
+    const catches=(await env.DB.prepare('SELECT species,quantity,weight_lb FROM catches WHERE trip_id=?').bind(id).all()).results;
     return respond({trip:{...trip,mixed_methods:JSON.parse(trip.mixed_methods),caught_any:Boolean(trip.caught_any),catches,edit_token_hash:undefined,browser_hash:undefined,trip_fingerprint:undefined}});
   }
   if (req.method==='POST' && (url.pathname==='/api/trips' || /^\/api\/trips\/[a-f0-9-]{36}$/.test(url.pathname))) {
@@ -64,7 +65,7 @@ export default {
         const token=req.headers.get('x-edit-token'); if (!token) return respond({error:'Edit token required.'},403);
         const existing=await env.DB.prepare('SELECT * FROM trips WHERE id=? AND edit_token_hash=?').bind(idFromPath,await sha(token)).first();
         if (!existing) return respond({error:'Report not found or access denied.'},404);
-        const prevCatches=(await env.DB.prepare('SELECT species,quantity FROM catches WHERE trip_id=?').bind(idFromPath).all()).results;
+        const prevCatches=(await env.DB.prepare('SELECT species,quantity,weight_lb FROM catches WHERE trip_id=?').bind(idFromPath).all()).results;
         const now=new Date().toISOString();
         const queries=[
           env.DB.prepare('INSERT INTO trip_edits(trip_id,edited_at,previous_json) VALUES (?,?,?)').bind(idFromPath,now,JSON.stringify({trip:existing,catches:prevCatches})),

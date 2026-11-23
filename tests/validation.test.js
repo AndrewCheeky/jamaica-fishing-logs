@@ -9,3 +9,5 @@ test('invalid quantity rejected',()=>assert.throws(()=>normalizeTrip({...base,ca
 
 test('all 13 supplied fishing locations are configured',()=>{assert.equal(BANKS.length,13);assert.equal(new Set(BANKS).size,13);assert.ok(BANKS.includes('Maiden Cay'));assert.ok(BANKS.includes('Morant Cays'));});
 test('unlisted fishing bank rejected',()=>assert.throws(()=>normalizeTrip({...base,bank:'Pedro Bank'})));
+test('weight optional and rounded',()=>{const t=normalizeTrip({...base,catches:[{species:'Tuna',quantity:2,weight_lb:41.26},{species:'Sailfish',quantity:1}]});assert.equal(t.catches[0].weight_lb,41.3);assert.equal(t.catches[1].weight_lb,null)});
+test('bad weight rejected',()=>{assert.throws(()=>normalizeTrip({...base,catches:[{species:'Tuna',quantity:2,weight_lb:-5}]}));assert.throws(()=>normalizeTrip({...base,catches:[{species:'Tuna',quantity:2,weight_lb:50000}]}))});
